@@ -1,3 +1,4 @@
+conda init bash
 conda create -n GovComVLLMv2  python=3.11.5 -y
 conda activate GovComVLLMv2
 # conda install -c "nvidia/label/cuda-12.1.0" cuda-toolkit cuda -y

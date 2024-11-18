@@ -2,9 +2,9 @@ code_version: v6.4
 group_name: ''
 
 llm: 
-  path: TheBloke/Nous-Hermes-2-Mixtral-8x7B-DPO-GPTQ
-  backend: transformers
-  is_api: false
+  path: gpt-4o-2024-05-13
+  backend: vllm
+  is_api: true
   render: false
   temperature: 0.0
   top_p: 1.0

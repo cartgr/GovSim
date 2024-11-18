@@ -18,6 +18,7 @@ from .scenarios.fishing.run import run as run_scenario_fishing
 from .scenarios.pollution.run import run as run_scenario_pollution
 from .scenarios.sheep.run import run as run_scenario_sheep
 
+os.environ["OPENAI_API_KEY"] = "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"
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig):
