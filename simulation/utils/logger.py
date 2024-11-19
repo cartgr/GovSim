@@ -14,9 +14,13 @@ logger.setLevel(logging.WARNING)
 
 class WandbLogger:
     def __init__(self, scenario_name, configs, debug=False, tags=[]) -> None:
+        # print("--------------------------------------")
+        # print(configs)
+        # print(configs['experiment']['env']['name'])
+        # print("--------------------------------------")
         run = wandb.init(
             project="EMS",
-            group=scenario_name,
+            group=configs['experiment']['env']['name'],
             config=configs,
             tags=tags,
             save_code=True,
