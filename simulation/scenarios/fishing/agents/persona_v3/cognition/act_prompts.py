@@ -26,6 +26,35 @@ def prompt_action_choose_amount_of_fish_to_catch(
     interval: list[int],
     consider_identity_persona: bool = True,
 ):
+    # Add check for Jack
+    if identity.name.lower() == "jack":
+        print(f"\nFishing range: {interval[0]}-{interval[-1]} tons")
+        # Print out the system prompt and context like the model would see
+        print("\n=== PROMPT for reasoning ===")
+        print(f"{get_sytem_prompt(identity)}")
+        print(location_time_info(current_location, current_time))
+        print(memory_prompt(identity, memories))
+        print(
+            f"\nTask: With a fishing range set between {interval[0]}-{interval[-1]}, how many tons of fish would you catch this month? "
+        )
+        print(reasoning_steps_prompt())
+        print('Put the final answer after "Answer:", example Answer: N tons.')
+        print("==================\n")
+        reasoning = input("Enter Jack's reasoning for fishing amount: ")
+        while True:
+            try:
+                option = int(input("Enter amount of fish Jack will catch (in tons): "))
+                if interval[0] <= option <= interval[-1]:
+                    break
+                print(f"Amount must be between {interval[0]} and {interval[-1]} tons")
+            except ValueError:
+                print("Please enter a valid number")
+
+        # Format the response similar to the model output
+        html_response = f"<strong>Reasoning:</strong> {reasoning}<br><strong>Answer:</strong> {option} tons"
+        return option, html_response
+
+    # Original model logic for other personas
     lm = model.start_chain(identity.name, "fishing_cognition_act", "choose_act_options")
 
     with user():

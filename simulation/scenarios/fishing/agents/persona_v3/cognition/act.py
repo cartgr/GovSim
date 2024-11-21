@@ -41,5 +41,8 @@ class FishingActComponent(ActComponent):
             interval,
             consider_identity_persona=self.cfg.consider_identity_persona,
         )
+        print(
+            f"\n=== RESPONSE for choose_how_many_fish_to_chat ===\n{res}\n==================\n"
+        )
         res = int(res)
         return res, [html]

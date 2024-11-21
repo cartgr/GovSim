@@ -86,6 +86,9 @@ def run(
             termination,
         ) = env.step(action)
 
+        # print the observation
+        print(f"\n=== OBSERVATION ===\n{obs}\n==================\n")
+
         stats = {}
         STATS_KEYS = [
             "conversation_resource_limit",

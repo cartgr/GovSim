@@ -92,6 +92,7 @@ class ConcurrentEnv:
             context="",
             chat=None,
             current_resource_num=self.internal_global_state["resource_in_pool"],
+            before_harvesting_resource_num=self.internal_global_state["resource_before_harvesting"],
             agent_resource_num={agent: 0 for agent in self.agents},
             before_harvesting_sustainability_threshold=sustainability_threshold,
         )
@@ -119,6 +120,7 @@ class ConcurrentEnv:
             context="",
             chat=None,
             current_resource_num=self.internal_global_state["resource_in_pool"],
+            before_harvesting_resource_num=self.internal_global_state["resource_before_harvesting"],
             agent_resource_num={agent: 0 for agent in self.agents},
             before_harvesting_sustainability_threshold=self.internal_global_state[
                 "sustainability_threshold"
@@ -137,6 +139,7 @@ class ConcurrentEnv:
             context="",
             chat=None,
             current_resource_num=self.internal_global_state["resource_in_pool"],
+            before_harvesting_resource_num=self.internal_global_state["resource_before_harvesting"],
             agent_resource_num=self.internal_global_state["last_collected_resource"],
             before_harvesting_sustainability_threshold=self.internal_global_state[
                 "sustainability_threshold"
@@ -154,6 +157,7 @@ class ConcurrentEnv:
             context="",
             chat=None,
             current_resource_num=self.internal_global_state["resource_in_pool"],
+            before_harvesting_resource_num=self.internal_global_state["resource_before_harvesting"],
             agent_resource_num={agent: 0 for agent in self.agents},
             before_harvesting_sustainability_threshold=self.internal_global_state[
                 "sustainability_threshold"

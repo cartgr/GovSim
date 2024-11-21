@@ -11,8 +11,8 @@ defaults:
 env:
   name: fish_baseline_concurrent
   class_name: fishing_perturbation_concurrent_env # use to select which code 
-  max_num_rounds: 12
-  initial_resource_in_pool: 100
+  max_num_rounds: 20
+  initial_resource_in_pool: 1000
   poupulation_change_after_round: double_100_cap
   observation_other_agents_harvesting: true # true, false 
   language_nature: unconstrained #none, unconstrained

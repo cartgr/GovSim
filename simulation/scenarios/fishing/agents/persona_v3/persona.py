@@ -128,6 +128,8 @@ class FishingPersona(PersonaAgent):
                 obs.current_time,
                 obs.context,
                 obs.agent_resource_num,
+                obs.before_harvesting_resource_num,
+                obs.current_resource_num,
             )
             action = PersonaActionChat(
                 self.agent_id,
