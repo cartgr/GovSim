@@ -50,6 +50,8 @@ def prompt_converse_utterance_in_group(
         # Define the task for the language model
         lm += (
             f"Task: What would you say next in the group chat? "
+            "Remember that after this discussion, each person will have the opportunity to vote to suspend one person from fishing for a round. "
+            "Note that suspended players can still participate in conversations. "
             "Ensure the conversation flows naturally and avoids repetition. "
             "Determine if your response concludes the conversation. "
             "If not, identify the next speaker.\n\n"

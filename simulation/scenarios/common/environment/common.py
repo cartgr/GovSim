@@ -7,6 +7,7 @@ class HarvestingObs(PersonaOberservation):
     current_resource_num: int
     before_harvesting_resource_num: int
     agent_resource_num: dict[str, int]
+    suspended_agents: set[str]
 
     def __init__(
         self,
@@ -21,6 +22,7 @@ class HarvestingObs(PersonaOberservation):
         agent_resource_num: dict[str, int],
         before_harvesting_sustainability_threshold: int,
         before_harvesting_resource_num: int,
+        suspended_agents: set[str] = None,
     ) -> None:
         super().__init__(
             phase,
@@ -37,6 +39,7 @@ class HarvestingObs(PersonaOberservation):
         self.before_harvesting_sustainability_threshold = (
             before_harvesting_sustainability_threshold
         )
+        self.suspended_agents = suspended_agents or set()
 
     def __str__(self):
         """Should have ALL info nicely formatted"""
@@ -55,7 +58,8 @@ class HarvestingObs(PersonaOberservation):
         if self.agent_resource_num:
             output.append("\nAgent Resources:")
             for agent, resources in self.agent_resource_num.items():
-                output.append(f"  {agent}: {resources}")
+                status = "SUSPENDED" if agent in self.suspended_agents else resources
+                output.append(f"  {agent}: {status}")
 
         if self.current_location_agents:
             output.append("\nAgents at Locations:")
@@ -74,5 +78,10 @@ class HarvestingObs(PersonaOberservation):
         if self.context:
             output.append("\nContext:")
             output.append(f"  {self.context}")
+
+        if self.suspended_agents:
+            output.append("\nSuspended Agents:")
+            for agent in self.suspended_agents:
+                output.append(f"  {agent}")
 
         return "\n".join(output)

@@ -32,6 +32,7 @@ class FishingConverseComponent(ConverseComponent):
         agent_resource_num: dict[str, int],
         lake_fish_before: int,
         lake_fish_after: int,
+        suspended_agents: set[str],
     ) -> tuple[list[tuple[str, str]], str]:
         current_conversation: list[tuple[PersonaIdentity, str]] = []
         html_interactions = []
@@ -72,8 +73,20 @@ class FishingConverseComponent(ConverseComponent):
             for persona in target_personas:
                 p = self.other_personas[persona.name]
                 fish_caught = agent_resource_num[p.agent_id]
-                current_report["individual_catches"][p.identity.name] = fish_caught
-                current_report["total"] += fish_caught
+
+                # Check if agent is suspended
+                print("\n\n\n\n")
+                print("suspended agents xyz:")
+                print(suspended_agents)
+                print(p.agent_id)
+                print(p.identity.name)
+                print("\n\n\n\n")
+
+                if p.agent_id in suspended_agents:
+                    current_report["individual_catches"][p.identity.name] = "SUSPENDED"
+                else:
+                    current_report["individual_catches"][p.identity.name] = fish_caught
+                    current_report["total"] += fish_caught
 
             self.fishing_reports.append(current_report)
 
@@ -86,7 +99,10 @@ class FishingConverseComponent(ConverseComponent):
                     f"Fish in lake before harvest: {report['lake_fish_before']} tons\n"
                 )
                 for name, catch in report["individual_catches"].items():
-                    formatted_report += f"- {name}: {catch} tons\n"
+                    if catch == "SUSPENDED":
+                        formatted_report += f"- {name}: SUSPENDED\n"
+                    else:
+                        formatted_report += f"- {name}: {catch} tons\n"
                 formatted_report += f"Total catch: {report['total']} tons\n"
                 formatted_report += (
                     f"Fish remaining in lake: {report['lake_fish_after']} tons\n\n"

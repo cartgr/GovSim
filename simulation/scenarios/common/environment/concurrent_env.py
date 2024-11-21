@@ -12,6 +12,7 @@ from simulation.persona.common import (
     PersonaActionHarvesting,
     PersonaEvent,
     PersonaIdentity,
+    PersonaActionVote,
 )
 
 from .common import HarvestingObs
@@ -92,9 +93,12 @@ class ConcurrentEnv:
             context="",
             chat=None,
             current_resource_num=self.internal_global_state["resource_in_pool"],
-            before_harvesting_resource_num=self.internal_global_state["resource_before_harvesting"],
+            before_harvesting_resource_num=self.internal_global_state[
+                "resource_before_harvesting"
+            ],
             agent_resource_num={agent: 0 for agent in self.agents},
             before_harvesting_sustainability_threshold=sustainability_threshold,
+            suspended_agents=self.internal_global_state["suspended_agents"],
         )
         return obs
 
@@ -120,11 +124,14 @@ class ConcurrentEnv:
             context="",
             chat=None,
             current_resource_num=self.internal_global_state["resource_in_pool"],
-            before_harvesting_resource_num=self.internal_global_state["resource_before_harvesting"],
+            before_harvesting_resource_num=self.internal_global_state[
+                "resource_before_harvesting"
+            ],
             agent_resource_num={agent: 0 for agent in self.agents},
             before_harvesting_sustainability_threshold=self.internal_global_state[
                 "sustainability_threshold"
             ],
+            suspended_agents=self.internal_global_state["suspended_agents"],
         )
         return obs
 
@@ -139,11 +146,14 @@ class ConcurrentEnv:
             context="",
             chat=None,
             current_resource_num=self.internal_global_state["resource_in_pool"],
-            before_harvesting_resource_num=self.internal_global_state["resource_before_harvesting"],
+            before_harvesting_resource_num=self.internal_global_state[
+                "resource_before_harvesting"
+            ],
             agent_resource_num=self.internal_global_state["last_collected_resource"],
             before_harvesting_sustainability_threshold=self.internal_global_state[
                 "sustainability_threshold"
             ],
+            suspended_agents=self.internal_global_state["suspended_agents"],
         )
         return state
 
@@ -157,13 +167,86 @@ class ConcurrentEnv:
             context="",
             chat=None,
             current_resource_num=self.internal_global_state["resource_in_pool"],
-            before_harvesting_resource_num=self.internal_global_state["resource_before_harvesting"],
+            before_harvesting_resource_num=self.internal_global_state[
+                "resource_before_harvesting"
+            ],
             agent_resource_num={agent: 0 for agent in self.agents},
             before_harvesting_sustainability_threshold=self.internal_global_state[
                 "sustainability_threshold"
             ],
+            suspended_agents=self.internal_global_state["suspended_agents"],
         )
         return state
+
+    def _observe_voting(self, agent) -> HarvestingObs:
+        # Create mapping between persona_ids and character names
+        persona_names = ["John", "Kate", "Jack", "Emma", "Luke"]
+        agent_name_map = {f"persona_{i}": name for i, name in enumerate(persona_names)}
+
+        # Initialize events list
+        events = []
+
+        # Modify harvesting data to show suspensions and use character names
+        harvesting_data = {}
+        raw_data = self.internal_global_state["last_collected_resource"].copy()
+        for agent_id, amount in raw_data.items():
+            character_name = agent_name_map[agent_id]
+            # Check if agent was suspended during this round
+            if agent_id in self.internal_global_state["suspended_agents"]:
+                harvesting_data[character_name] = "SUSPENDED"
+            else:
+                harvesting_data[character_name] = amount
+
+        # Add event showing current harvesting data to help inform voting
+        events.append(
+            PersonaEvent(
+                f"Monthly harvest report: {harvesting_data}",
+                created=self.internal_global_state["next_time"][agent],
+                expiration=get_expiration_next_month(
+                    self.internal_global_state["next_time"][agent]
+                ),
+                always_include=True,
+            )
+        )
+
+        return HarvestingObs(
+            phase="voting",
+            current_location="voting_room",
+            current_location_agents=self.internal_global_state["next_location"],
+            current_time=self.internal_global_state["next_time"][agent],
+            events=events,
+            context="Voting phase: You may vote to suspend one agent from fishing in the next round",
+            chat=None,
+            current_resource_num=self.internal_global_state["resource_in_pool"],
+            before_harvesting_resource_num=self.internal_global_state[
+                "resource_before_harvesting"
+            ],
+            agent_resource_num=harvesting_data,  # Using the modified data that shows suspensions
+            before_harvesting_sustainability_threshold=self.internal_global_state[
+                "sustainability_threshold"
+            ],
+            suspended_agents=self.internal_global_state["suspended_agents"],
+        )
+
+    def _observe_conversation(self, agent) -> HarvestingObs:
+        return HarvestingObs(
+            phase="conversation",
+            current_location=self.internal_global_state["next_location"][agent],
+            current_location_agents=self.internal_global_state["next_location"],
+            current_time=self.internal_global_state["next_time"][agent],
+            events=[],
+            context="Conversation phase",
+            chat=None,
+            current_resource_num=self.internal_global_state["resource_in_pool"],
+            before_harvesting_resource_num=self.internal_global_state[
+                "resource_before_harvesting"
+            ],
+            agent_resource_num=self.internal_global_state["last_collected_resource"],
+            before_harvesting_sustainability_threshold=self.internal_global_state[
+                "sustainability_threshold"
+            ],
+            suspended_agents=self.internal_global_state["suspended_agents"],
+        )
 
     def _observe(self, agent) -> HarvestingObs:
         """
@@ -178,8 +261,12 @@ class ConcurrentEnv:
             state = self._observe_pool_after_harvesting(agent)
         elif self.phase == "restaurant":
             state = self._observe_restaurant(agent)
+        elif self.phase == "voting":
+            state = self._observe_voting(agent)
         elif self.phase == "home":
             state = self._observe_home(agent)
+        elif self.phase == "conversation":
+            state = self._observe_conversation(agent)
         return state
 
     def close(self):
@@ -226,6 +313,8 @@ class ConcurrentEnv:
             "next_location": {},
             "next_time": {},
             "action": {},
+            "votes": {},  # Track current round votes
+            "suspended_agents": set(),  # Track currently suspended agents
         }
         for agent in self.agents:
             self._init_agent(agent)
@@ -233,7 +322,13 @@ class ConcurrentEnv:
         self._agent_selector = agent_selector(self.agents)
         self.agent_selection = self._agent_selector.next()
         self._phase_selector = agent_selector(
-            [self.POOL_LOCATION, "pool_after_harvesting", "restaurant", "home"]
+            [
+                self.POOL_LOCATION,
+                "pool_after_harvesting",
+                "restaurant",
+                "voting",
+                "home",
+            ]
         )
         self.phase = self._phase_selector.next()
 
@@ -354,7 +449,12 @@ class ConcurrentEnv:
             self.rewards[agent] += res
 
     def _step_lake_bet(self, action: PersonaActionHarvesting):
-        res = action.quantity
+        # If agent is suspended, they can't harvest
+        if self.agent_selection in self.internal_global_state["suspended_agents"]:
+            res = 0
+        else:
+            res = action.quantity
+
         self.internal_global_state["wanted_resource"][self.agent_selection] = res
         self.internal_global_state["action"][self.agent_selection] = action
         self.internal_global_state["next_location"][
@@ -382,9 +482,9 @@ class ConcurrentEnv:
         # We have a group conversation, we register that each was there and go in the next phase for everyone, since we had a group conversation
         if type(action) == PersonaActionChat:
             self.log_step_conversation(action)
-            # Advance to the next phase
+            # Advance to the voting phase instead of home
             for a in self.agents:
-                self.internal_global_state["next_location"][a] = "home"
+                self.internal_global_state["next_location"][a] = "voting_room"
                 self.internal_global_state["next_time"][a] = get_reflection_day(
                     self.internal_global_state["next_time"][a]
                 )
@@ -398,8 +498,81 @@ class ConcurrentEnv:
         self.internal_global_state["next_time"][self.agent_selection] += timedelta(
             days=1
         )
-        # A possible idea here is to probe the agent for some reflection / thoughts
-        # NOTE do we need to register something here?
+
+        if self._agent_selector.is_last():
+            self.save_log()
+            self.num_round += 1
+            self.phase = self._phase_selector.next()
+
+            # We want to see also the discussion in case no fish remain
+            self.terminations = {
+                agent: (
+                    self.internal_global_state["resource_in_pool"]
+                    < 5  # less than 5 fish remain, so we collapse
+                    or self.num_round >= self.cfg.max_num_rounds
+                )
+                for agent in self.agents
+            }
+
+            self.internal_global_state["resource_in_pool"] = min(
+                self.cfg.initial_resource_in_pool,
+                self.internal_global_state["resource_in_pool"] * 2,
+            )  # Double the fish in the lake, but cap at 100
+            self.internal_global_state["resource_before_harvesting"] = (
+                self.internal_global_state["resource_in_pool"]
+            )
+            self.internal_global_state["sustainability_threshold"] = int(
+                (self.internal_global_state["resource_in_pool"] // 2)
+                // self.internal_global_state["num_agents"]
+            )
+            if self.cfg.harvesting_order == "random-sequential":
+                agents = list(np.random.permutation(self.agents))
+                self._agent_selector = agent_selector(agents)
+        self.agent_selection = self._agent_selector.next()
+
+    def _step_voting(self, action: PersonaActionVote):
+        # Clear suspended agents at the start of voting phase
+        if self._agent_selector.is_first():
+            self.internal_global_state["suspended_agents"].clear()
+
+        if action.vote_for:
+            self.internal_global_state["votes"][self.agent_selection] = {
+                "target": action.vote_for,
+                "reason": action.reason,
+            }
+
+        if self._agent_selector.is_last():
+            # Count votes
+            vote_counts = {}
+            vote_reasons = {}
+            for voter, vote_data in self.internal_global_state["votes"].items():
+                target = vote_data["target"]
+                if target:
+                    vote_counts[target] = vote_counts.get(target, 0) + 1
+                    if target not in vote_reasons:
+                        vote_reasons[target] = []
+                    vote_reasons[target].append(vote_data["reason"])
+
+            print("\n\n\n\n")
+            print(f"VOTE COUNTS ABC: {vote_counts}")
+            # Check for majority votes
+            num_active_agents = len(self.agents) - len(
+                self.internal_global_state["suspended_agents"]
+            )
+            for agent_id, votes in vote_counts.items():
+                if votes > num_active_agents / 2:  # Simple majority
+                    self.internal_global_state["suspended_agents"].add(agent_id)
+
+            # Clear votes for next round
+            self.internal_global_state["votes"].clear()
+
+            # Move to home phase
+            self.phase = self._phase_selector.next()
+            # Set location to home for all agents after voting
+            for a in self.agents:
+                self.internal_global_state["next_location"][a] = "home"
+
+        self.agent_selection = self._agent_selector.next()
 
     def step(self, action: PersonaAction) -> tuple[str, HarvestingObs, dict, dict]:
         if self.terminations[self.agent_selection]:
@@ -412,44 +585,16 @@ class ConcurrentEnv:
             assert type(action) == PersonaActionHarvesting
             self._step_lake_bet(action)
         elif self.phase == "pool_after_harvesting":
-            assert action.location == self.POOL_LOCATION
             self._step_pool_after_harvesting(action)
         elif self.phase == "restaurant":
             assert action.location == "restaurant"
             self._step_restaurant(action)
+        elif self.phase == "voting":
+            assert isinstance(action, PersonaActionVote)
+            self._step_voting(action)
         elif self.phase == "home":
             assert action.location == "home"
             self._step_home(action)
-            if self._agent_selector.is_last():
-                self.save_log()
-                self.num_round += 1
-                self.phase = self._phase_selector.next()
-
-                # We want to see also the discussion in case no fish remain
-                self.terminations = {
-                    agent: (
-                        self.internal_global_state["resource_in_pool"]
-                        < 5  # less than 5 fish remain, so we collapse
-                        or self.num_round >= self.cfg.max_num_rounds
-                    )
-                    for agent in self.agents
-                }
-
-                self.internal_global_state["resource_in_pool"] = min(
-                    self.cfg.initial_resource_in_pool,
-                    self.internal_global_state["resource_in_pool"] * 2,
-                )  # Double the fish in the lake, but cap at 100
-                self.internal_global_state["resource_before_harvesting"] = (
-                    self.internal_global_state["resource_in_pool"]
-                )
-                self.internal_global_state["sustainability_threshold"] = int(
-                    (self.internal_global_state["resource_in_pool"] // 2)
-                    // self.internal_global_state["num_agents"]
-                )
-                if self.cfg.harvesting_order == "random-sequential":
-                    agents = list(np.random.permutation(self.agents))
-                    self._agent_selector = agent_selector(agents)
-            self.agent_selection = self._agent_selector.next()
 
         return (
             self.agent_selection,

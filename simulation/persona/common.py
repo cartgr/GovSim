@@ -1,3 +1,6 @@
+from typing import Optional, Union
+
+
 class PersonaIdentity:
     def __init__(
         self,
@@ -155,3 +158,20 @@ class PersonaEvent:
         self.created = created
         self.expiration = expiration
         self.always_include = always_include
+
+
+class PersonaActionVote(PersonaAction):
+    vote_for: Optional[str]
+    reason: str
+
+    def __init__(
+        self,
+        agent_id: str,
+        location: str,
+        vote_for: Optional[str],  # The agent being voted for suspension
+        reason: str,  # Why they're voting for suspension
+        html_interactions: Optional[Union[str, list[str]]] = None,
+    ):
+        super().__init__(agent_id, location, html_interactions=html_interactions)
+        self.vote_for = vote_for
+        self.reason = reason

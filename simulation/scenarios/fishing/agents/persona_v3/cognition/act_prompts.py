@@ -26,8 +26,16 @@ def prompt_action_choose_amount_of_fish_to_catch(
     interval: list[int],
     consider_identity_persona: bool = True,
 ):
-    # Add check for Jack
+    # Add check for Jack AND check if suspended
     if identity.name.lower() == "jack":
+        # First check if Jack is suspended
+        if "SUSPENDED" in context or any(
+            "suspended" in str(memory).lower() for memory in memories
+        ):
+            print("\n=== SUSPENSION NOTICE ===")
+            print("Jack is currently suspended from fishing this round.")
+            return 0, "<strong>Status:</strong> SUSPENDED"
+
         print(f"\nFishing range: {interval[0]}-{interval[-1]} tons")
         # Print out the system prompt and context like the model would see
         print("\n=== PROMPT for reasoning ===")

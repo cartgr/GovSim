@@ -17,6 +17,7 @@ from simulation.persona.common import (
     PersonaActionChat,
     PersonaActionHarvesting,
     PersonaIdentity,
+    PersonaActionVote,
 )
 from simulation.persona.embedding_model import EmbeddingModel
 from simulation.persona.memory import AssociativeMemory, Scratch
@@ -30,6 +31,7 @@ from .cognition import (
     FishingReflectComponent,
     FishingStoreComponent,
 )
+from .cognition.vote_prompts import prompt_voting_decision
 
 
 class FishingPersona(PersonaAgent):
@@ -77,6 +79,16 @@ class FishingPersona(PersonaAgent):
         # phase based game
 
         if obs.current_location == "lake" and obs.phase == "lake":
+            # If agent is suspended, return 0 fish but keep correct location
+            if self.agent_id in obs.suspended_agents:
+                return PersonaActionHarvesting(
+                    self.agent_id,
+                    "lake",  # Make sure this matches self.POOL_LOCATION
+                    0,
+                    stats={},
+                    html_interactions="<strong>Framework</strong>: Agent is suspended",
+                )
+
             # Stage 1. Pond situation / Stage 2. Fishermen’s decisions
             retireved_memory = self.retrieve.retrieve([obs.current_location], 10)
             if obs.current_resource_num > 0:
@@ -130,6 +142,7 @@ class FishingPersona(PersonaAgent):
                 obs.agent_resource_num,
                 obs.before_harvesting_resource_num,
                 obs.current_resource_num,
+                obs.suspended_agents,
             )
             action = PersonaActionChat(
                 self.agent_id,
@@ -139,6 +152,44 @@ class FishingPersona(PersonaAgent):
                 stats={"conversation_resource_limit": resource_limit},
                 html_interactions=html_interactions,
             )
+        elif obs.current_location == "voting_room":
+            # Get the identities of other agents for voting
+            other_agents = []
+            # Create mapping between persona_ids and character names
+            agent_name_map = {}  # persona_0 -> John etc
+            name_agent_map = {}  # John -> persona_0 etc
+            for agent_id, location in obs.current_location_agents.items():
+                if agent_id != self.agent_id:
+                    agent_num = int(agent_id.split("_")[1])
+                    character_name = ["John", "Kate", "Jack", "Emma", "Luke"][agent_num]
+                    agent_name_map[agent_id] = character_name
+                    name_agent_map[character_name] = agent_id
+                    other_agents.append(
+                        character_name
+                    )  # Use character names instead of IDs
+
+            vote_for, reason, html_interactions = prompt_voting_decision(
+                self.act.model,
+                self.identity,
+                self.retrieve.retrieve([obs.current_location], 10),
+                obs.current_location,
+                obs.current_time,
+                obs.context,
+                obs.agent_resource_num,
+                other_agents,
+            )
+
+            # Map the voted name back to agent_id if there was a vote
+            vote_for_id = name_agent_map.get(vote_for) if vote_for else None
+
+            action = PersonaActionVote(
+                self.agent_id,
+                "voting_room",
+                vote_for_id,  # Use the mapped ID instead of the name
+                reason,
+                html_interactions=html_interactions,
+            )
+
         elif obs.current_location == "home":
             # Stage 3. Social Interaction b)
             # TODO How what should we reflect, what is the initial focal points?
