@@ -22,6 +22,7 @@ class FishingConverseComponent(ConverseComponent):
     ):
         super().__init__(model, retrieve, cfg)
         self.fishing_reports = []  # Store historical reports
+        self.sustainable_threshold = None
 
     def converse_group(
         self,
@@ -61,13 +62,16 @@ class FishingConverseComponent(ConverseComponent):
             self.cfg.inject_resource_observation
             and self.cfg.inject_resource_observation_strategy == "manager"
         ):
-            # prepare report from pov of the manager
+            # Calculate sustainable threshold (total fish / number of agents)
+            self.sustainable_threshold = lake_fish_before / (2 * len(target_personas))
+
             current_report = {
                 "date": current_time.strftime("%B %Y"),
                 "individual_catches": {},
                 "total": 0,
                 "lake_fish_before": lake_fish_before,
                 "lake_fish_after": lake_fish_after,
+                "sustainable_threshold": self.sustainable_threshold,
             }
 
             for persona in target_personas:
@@ -90,8 +94,8 @@ class FishingConverseComponent(ConverseComponent):
 
             self.fishing_reports.append(current_report)
 
-            # Format all reports, with most recent first
-            formatted_report = "Monthly Fishing Report:\n\n"
+            # Initialize formatted_report before the loop
+            formatted_report = "Monthly Fishing Report:"
 
             for report in reversed(self.fishing_reports):
                 formatted_report += f"=== {report['date']} ===\n"
@@ -102,7 +106,12 @@ class FishingConverseComponent(ConverseComponent):
                     if catch == "SUSPENDED":
                         formatted_report += f"- {name}: SUSPENDED\n"
                     else:
-                        formatted_report += f"- {name}: {catch} tons\n"
+                        status = (
+                            " (ACCEPTABLE)"
+                            if catch <= report["sustainable_threshold"]
+                            else " (UNACCEPTABLE)"
+                        )
+                        formatted_report += f"- {name}: {catch} tons{status}\n"
                 formatted_report += f"Total catch: {report['total']} tons\n"
                 formatted_report += (
                     f"Fish remaining in lake: {report['lake_fish_after']} tons\n\n"
@@ -111,9 +120,7 @@ class FishingConverseComponent(ConverseComponent):
             current_conversation.append(
                 (
                     PersonaIdentity("framework", "Mayor"),
-                    (
-                        f"Ladies and gentlemen, here is our fishing report history:\n\n{formatted_report}"
-                    ),
+                    f"Ladies and gentlemen, here is our fishing report. I have classified each harvest as acceptable or not based on the research my scientists have done:\n\n{formatted_report}",
                 ),
             )
 
@@ -145,9 +152,19 @@ class FishingConverseComponent(ConverseComponent):
                 # Get Jack's response
                 utterance = input(f"Enter Jack's response: ")
                 end_conversation = input("End conversation? (y/n): ").lower() == "y"
-                next_name = (
-                    input("Who should speak next?: ") if not end_conversation else None
-                )
+                while True:
+                    next_name = (
+                        input("Who should speak next?: ").lower()
+                        if not end_conversation
+                        else None
+                    )
+                    if next_name is None or next_name in [
+                        p.lower() for p in self.other_personas.keys()
+                    ]:
+                        break
+                    print(
+                        f"Invalid name. Please choose from: {', '.join(self.other_personas.keys())}"
+                    )
                 h = f"<strong>Jack</strong>: {utterance}"
                 html_interactions.append(h)
             else:
@@ -178,7 +195,13 @@ class FishingConverseComponent(ConverseComponent):
                 self.model._log_and_print("=== CONVERSATION END ===\n")
                 break
             else:
-                current_persona = self.other_personas[next_name].identity
+                # Convert next_name to proper case by finding the matching key
+                proper_name = next(
+                    name
+                    for name in self.other_personas.keys()
+                    if name.lower() == next_name.lower()
+                )
+                current_persona = self.other_personas[proper_name].identity
 
         summary_conversation, h = prompt_summarize_conversation_in_one_sentence(
             self.model, self.conversation_render(current_conversation)
